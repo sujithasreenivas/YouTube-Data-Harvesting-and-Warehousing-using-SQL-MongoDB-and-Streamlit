@@ -7,10 +7,9 @@ import pandas as pd
 import pymongo 
 import time
 from streamlit_option_menu import option_menu
-from googleapiclient.discovery import build
 from PIL import Image
 # SETTING PAGE CONFIGURATIONS
-#icon = Image.open("C:Desktop\youtube.png")
+
 st.set_page_config(page_title= "Youtube Data Harvesting and Warehousing ",
                    layout= "wide",
                    initial_sidebar_state= "expanded",
@@ -98,7 +97,7 @@ def get_video_details(_youtube,video_id):
             published_dates = video["snippet"]["publishedAt"]
             parsed_dates = datetime.strptime(published_dates,'%Y-%m-%dT%H:%M:%SZ')
             format_date = parsed_dates.strftime('%Y-%m-%d')
-            videos = dict(#channel_name= video["snippet"]["channel_name"],
+            videos = dict(
                           video_id = video["id"],
                           channel_id = video["snippet"]["channelId"],
                           video_name = video["snippet"]["title"],
@@ -147,7 +146,7 @@ def get_comments(_youtube,video_ids):
 #................User Input.............................:
 channel_ids = st.text_input("Enter the channel Id")
 channel_list = [channel_ids]
-#print(channel_list)
+
 submit = st.button("Fetch Channel details and Upload to MongoDB Database")
 #.............................. MongoDB Connection
 client = pymongo.MongoClient("mongodb://localhost:27017/")
@@ -161,7 +160,6 @@ col3 = db["comment_data"]
 
 #............mysql connection........................
 connection = mysql.connector.connect(host="localhost",
-                                     #streamlitport=3306,
                                      user="root",
                                      password="sujitha@1988",
                                      database="youtube_db")
@@ -203,45 +201,24 @@ def channel_names():
 
 st.subheader(":orange[Inserting Data into MySQL for further Data Analysis] ⌛")
 user_input =st.multiselect("Select the channel to be inserted into MySQL Tables",options = channel_names())
-#.......................print(user_input)
+
 submit1 = st.button("Upload data into MySQL")
-#ch_names = channel_names()
-def get_channel_details():
-            print("203 ")
-            query = {"channel_name":{"$in":user_input}}
-            projection = {"_id":0,"channel_id":1,"channel_name":1,"channel_views":1,"subscriber_count":1,"total_videos":1,"playlist_id":1}
-            x = col1.find(query,projection)
-            channel_table = pd.DataFrame(list(x))
-            #print("209 ",channel_data.to_dict())
-            return channel_table
-#........................Fetching Video details..................:
-def get_video_details():
-            print("400")
-            query = {"channel_id":{"$in":channel_list}}
-            projection = {"_id":0,"video_id":1,"channel_id":1,"video_name":1,"published_date":1,"view_count":1,"like_count":1,"comment_count":1,"duration":1}
-            x = col2.find(query,projection)
-            video_table = pd.DataFrame(x)
-            print(list(video_table))
-            #return video_table
-video_data = get_video_details()
-print(video_data)
+
+
+#...........inserting channel details into mysql.......................
 def insert_into_channels():
-                #collections=db.channel_table
-                #print("213 ",user_input)
                 for i in db.channel_data.find({"channel_name":{"$in":user_input}}):
                  query = """INSERT INTO channel_data(channel_id,channel_name,channel_views,subscriber_count,total_videos,playlist_id)VALUES(%s,%s,%s,%s,%s,%s)"""
                  values = (i['channel_id'],i['channel_name'],i['channel_views'],i['subscriber_count'],i['total_videos'],i['playlist_id'])
                  cursor.execute(query,values)
                  connection.commit()
+  #...............inserting video details into mysql....................               
 def insert_into_videos():
-            #collections1 = db.video_details
-            print("303", user_input)
-            for chn in db.channel_data.find({"channel_name":{"$in":user_input}}):
-             print("239",chn)
-             for i in db.video_data.find({"channel_id":chn["channel_id"]}).limit(25):
-              print("241",i)
-              query1 = """INSERT INTO video_data(video_id,channel_id,video_name,published_date,view_count,like_count,comment_count,duration) VALUES(%s,%s,%s,%s,%s,%s,%s,%s)"""
-              values=(i["video_id"],
+        for chn in db.channel_data.find({"channel_name":{"$in":user_input}}):
+            for i in db.video_data.find({"channel_id":chn["channel_id"]}).limit(25):
+
+                query1 = """INSERT INTO video_data(video_id,channel_id,video_name,published_date,view_count,like_count,comment_count,duration) VALUES(%s,%s,%s,%s,%s,%s,%s,%s)"""
+                values=(i["video_id"],
                      i["channel_id"],
                      i["video_name"],
                      i["published_date"],
@@ -250,43 +227,30 @@ def insert_into_videos():
                      i["comment_count"],
                      i["duration"]
                     )
-              cursor.execute(query1,values)
-              connection.commit()
+                cursor.execute(query1,values)
+        connection.commit()
             
 #..... Getting video _id from video table.................
 video_ids = col2.distinct("video_id")
 vd=[]
 vd.append(video_ids)
-#st.write(video_ids)
-# #Fetch video_ids from mongoDb
-#video_ids = video_data["video_id"].to_list()
-#print("600",vd[0][0])
+
 
 #insert comments into mysql.............................
 
 def insert_into_comments():
-     print("500")
-     maxvalue=len(vd)
-     if len(vd) > 50 :
-      maxvalue=50
-     print("number of videos ", len(vd))
-     #for j in range(0,maxvalue,1):
-      #for i in db.comment_data.find({"video_id":vd[j]}):
-       #print("processing videos ", vd[j])
-     for vid in db.channel_data.find({"channel_name":{"$in":user_input}}):
-        print("processing video ", vid)
+    for vid in db.channel_data.find({"channel_name":{"$in":user_input}}):
         for i in db.video_data.find({"channel_id": vid['channel_id']}).limit(25):
          for com in db.comment_data.find({"video_id":i['video_id']}).limit(50):
-          query="""INSERT INTO comment_data (comment_id,video_id,comment_text,comment_author,comment_published_date)
+            query="""INSERT INTO comment_data (comment_id,video_id,comment_text,comment_author,comment_published_date)
                 VALUES (%s, %s, %s, %s, %s)"""
-          values=(com['comment_id'],
+            values=(com['comment_id'],
                  com['video_id'],
                  com['comment_text'],
                  com['comment_author'],
                  com['comment_published_date'])
-          cursor.execute(query,values)
-     connection.commit()
-     #connection.close()
+            cursor.execute(query,values)
+    connection.commit()
 questions = st.selectbox("Select any questions given below:",
                         ['Click the question that you would like to query',
                         '1. What are the names of all the videos and their corresponding channels?',
@@ -305,14 +269,12 @@ if questions == '1. What are the names of all the videos and their corresponding
     query1 = "select channel_name as Channel_name ,video_name as Video_names from channel_data c join video_data v on c.channel_id = v.channel_id;"
     cursor.execute(query1)
     result = cursor.fetchall()
-    print("333: ", result)
     table1 = pd.DataFrame(result,columns=cursor.column_names)
     st.table(table1)
 elif questions == '2. Which channels have the most number of videos, and how many videos do they have?':
     query2 = "select channel_name,count(video_name) as Most_Number_of_Videos from video_data v join channel_data c on c.channel_id = v.channel_id group by channel_name order by count(video_name) desc;"
     cursor.execute(query2)
     result1 = cursor.fetchall()
-    print("340: ", result1)
     table2 = pd.DataFrame(result1,columns =cursor.column_names)
     st.table(table2)
     st.bar_chart(table2.set_index("channel_name"))
@@ -320,17 +282,14 @@ elif questions == '3. What are the top 10 most viewed videos and their respectiv
     query3 = "select channel_name as Channel_name,video_name as Video_name,view_count as Top_10_Viewed_Videos from channel_data c join video_data v on c.channel_id = v.channel_id order by view_count desc limit 10;"
     cursor.execute(query3)
     result2 = cursor.fetchall()
-    print("348: ", result2)
     table3 = pd.DataFrame(result2,columns=cursor.column_names)
     st.table(table3) 
 elif questions == '4. How many comments were made on each video, and what are their corresponding video names?':
     query4 = "select channel_name as Channel_name, video_name as Video_name,comment_count as Comments_Count from video_data v join channel_data c on c.channel_id = v.channel_id order by comment_count desc;"
     cursor.execute(query4)
     result3 = cursor.fetchall()
-    print("356: ", result3)
     table4 = pd.DataFrame(result3,columns=cursor.column_names)
     st.table(table4)
-
 elif questions == '5. Which videos have the highest number of likes, and what are their corresponding channel names?':
     query5 = "select channel_name as Channel_name,video_name as Video_name,like_count as Number_of_likes from video_data v join channel_data c on c.channel_id = v.channel_id order by like_count desc;"
     cursor.execute(query5)
@@ -344,7 +303,7 @@ elif questions == '6. What is the total number of likes for each video, and what
     table6 = pd.DataFrame(result5,columns=cursor.column_names)
     st.table(table6)
 elif questions == '7. What is the total number of views for each channel, and what are their corresponding channel names?':
-    query7 = "select channel_name as Channel_name,channel_views as Total_No_of_views from video_data v join channel_data c on c.channel_id = v.channel_id group by c.channel_id,v.channel_id order by channel_views desc;"
+    query7 = "select c.channel_name as Channel_name,c.channel_views as Total_No_of_views from video_data v join channel_data c on c.channel_id = v.channel_id group by c.channel_name,c.channel_views order by channel_views desc;"
     cursor.execute(query7)
     result6 = cursor.fetchall()
     table7 = pd.DataFrame(result6,columns=cursor.column_names)
@@ -368,12 +327,9 @@ submit3 = st.button("enter")
 if submit1:
  with st.spinner('Please wait '):
      time.sleep(5)
- #channel_data = get_channel_details
  cursor = connection.cursor()
- #collections=db.channel_data
  try:
     insert_into_channels()
-    get_video_details()
     insert_into_videos()
  except Exception as error:
     print("Channel details already transformed !!",type(error).__name__, "–", error) 
