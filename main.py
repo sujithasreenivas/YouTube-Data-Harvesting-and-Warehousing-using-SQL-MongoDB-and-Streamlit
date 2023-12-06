@@ -321,8 +321,6 @@ elif questions =='9. Which videos have the highest number of comments, and what 
     result8 = cursor.fetchall()
     table9 = pd.DataFrame(result8,columns=cursor.column_names)
     st.table(table9)    
-submit3 = st.button("enter")
-
 
 if submit1:
  with st.spinner('Please wait '):
